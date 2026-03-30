@@ -35,11 +35,11 @@ Slack message → /api/webhooks/slack → lib/bot.ts (Chat adapter)
 
 ### Data Model
 
-| Table | Purpose |
-|---|---|
-| `agents` | Team members with Slack IDs |
-| `leads` | CRM records with status pipeline |
-| `lead_notes` | Interaction audit trail |
+| Table          | Purpose                              |
+| -------------- | ------------------------------------ |
+| `agents`       | Team members with Slack IDs          |
+| `leads`        | CRM records with status pipeline     |
+| `lead_notes`   | Interaction audit trail              |
 | `thread_state` | Slack thread message history (JSONB) |
 
 Lead status pipeline: `new → contacted → qualified → negotiating → closed_won / closed_lost`
@@ -54,7 +54,15 @@ Lead status pipeline: `new → contacted → qualified → negotiating → close
 ## Environment Variables
 
 See `.env.local.example`. Required:
+
 - `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`
 - `OPENAI_API_KEY`
 - `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
+
+For multi-workspace OAuth mode, use:
+
+- `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
+- Optional: `SLACK_ENCRYPTION_KEY`, `SLACK_REDIRECT_URI`, `NEXT_PUBLIC_APP_URL`
+
+See `docs/SLACK_SETUP.md` for full setup, scopes, install/callback routes, and troubleshooting.
