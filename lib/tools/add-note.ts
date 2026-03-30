@@ -1,36 +1,59 @@
-import { supabase } from '@/lib/supabase'
-import type { AddNoteArgs, LeadNote } from '@/types'
+import { supabase } from "@/lib/supabase";
+import type { AddNoteArgs, LeadNote } from "@/types";
 
 export async function executeAddNote(
   args: AddNoteArgs,
-  agentId: string
+  agentId: string,
 ): Promise<{ success: boolean; note: LeadNote } | { error: string }> {
   try {
-    const now = new Date().toISOString()
+    console.info("tool:addNote:start", {
+      agentId,
+      leadId: args.lead_id,
+      contentLength: args.content.length,
+    });
 
-    const { data: note, error: noteError } = await supabase
-      .from('lead_notes')
-      .insert({
-        lead_id: args.lead_id,
-        content: args.content,
-        created_by: agentId,
-        created_at: now,
-      })
-      .select()
-      .single()
+    const now = new Date().toISOString();
+
+    const { data: note, error: noteError } = await supabase.rpc(
+      "add_lead_note_and_touch_lead",
+      {
+        p_lead_id: args.lead_id,
+        p_agent_id: agentId,
+        p_content: args.content,
+        p_created_at: now,
+      },
+    );
 
     if (noteError || !note) {
-      return { error: noteError?.message ?? 'Failed to add note' }
+      const message = noteError?.message ?? "Failed to add note";
+      if (message.includes("Lead not found or not assigned to you")) {
+        console.error("tool:addNote:error", {
+          agentId,
+          leadId: args.lead_id,
+          error: message,
+        });
+        return { error: "Lead not found or not assigned to you" };
+      }
+      console.error("tool:addNote:error", {
+        agentId,
+        leadId: args.lead_id,
+        error: message,
+      });
+      return { error: message };
     }
 
-    // Update last_contacted_at on the lead
-    await supabase
-      .from('leads')
-      .update({ last_contacted_at: now })
-      .eq('id', args.lead_id)
-
-    return { success: true, note: note as LeadNote }
+    console.info("tool:addNote:success", {
+      agentId,
+      leadId: args.lead_id,
+      noteId: (note as LeadNote).id,
+    });
+    return { success: true, note: note as LeadNote };
   } catch (err) {
-    return { error: String(err) }
+    console.error("tool:addNote:exception", {
+      agentId,
+      leadId: args.lead_id,
+      error: String(err),
+    });
+    return { error: String(err) };
   }
 }

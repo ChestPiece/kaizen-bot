@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.48",
     "@chat-adapter/slack": "^4.23.0",
     "@chat-adapter/state-memory": "^4.23.0",
     "@supabase/supabase-js": "^2.100.1",

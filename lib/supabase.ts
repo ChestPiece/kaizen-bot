@@ -1,25 +1,49 @@
-import { createClient } from '@supabase/supabase-js'
-import type { Agent } from '@/types'
+import { createClient } from "@supabase/supabase-js";
+import type { Agent } from "@/types";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Singleton server-side client using service role key (bypasses RLS)
-export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+if (!supabaseUrl) {
+  throw new Error(
+    "Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL",
+  );
+}
+
+if (!supabaseServiceRoleKey) {
+  throw new Error(
+    "Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY",
+  );
+}
+
+export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: { persistSession: false },
-})
+});
 
 /**
  * Look up an internal agent record by their Slack user ID.
  * Returns null if the Slack user has not been registered in the agents table.
  */
-export async function getAgentBySlackId(slackUserId: string): Promise<Agent | null> {
+export async function getAgentBySlackId(
+  slackUserId: string,
+): Promise<Agent | null> {
   const { data, error } = await supabase
-    .from('agents')
-    .select('*')
-    .eq('slack_user_id', slackUserId)
-    .single()
+    .from("agents")
+    .select("*")
+    .eq("slack_user_id", slackUserId)
+    .single();
 
-  if (error || !data) return null
-  return data as Agent
+  if (error) {
+    if (error.code !== "PGRST116") {
+      // PGRST116 = no rows found; anything else is a connectivity or config issue
+      console.error("getAgentBySlackId: unexpected DB error", {
+        slackUserId,
+        code: error.code,
+        message: error.message,
+      });
+    }
+    return null;
+  }
+  if (!data) return null;
+  return data as Agent;
 }

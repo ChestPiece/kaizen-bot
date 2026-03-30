@@ -18,7 +18,7 @@ bot.onNewMention(async (thread, message) => {
   await thread.subscribe()
   await runAgent({
     userMessage: message.text,
-    slackUserId: message.author.id,
+    slackUserId: message.author.userId,
     threadId: thread.id,
     thread,
   })
@@ -27,7 +27,7 @@ bot.onNewMention(async (thread, message) => {
 bot.onSubscribedMessage(async (thread, message) => {
   await runAgent({
     userMessage: message.text,
-    slackUserId: message.author.id,
+    slackUserId: message.author.userId,
     threadId: thread.id,
     thread,
   })
