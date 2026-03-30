@@ -1,6 +1,6 @@
 import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
-import { createMemoryState } from "@chat-adapter/state-memory";
+import { createPostgresState } from "@chat-adapter/state-pg";
 import { runAgent } from "./agent";
 
 const {
@@ -70,6 +70,12 @@ export const slackMode =
         ? "multi-workspace"
         : "single-workspace";
 
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "Missing required environment variable: DATABASE_URL",
+  );
+}
+
 export const slackAdapter =
   slackMode === "single-workspace"
     ? createSlackAdapter({
@@ -88,7 +94,7 @@ export const bot = new Chat({
   adapters: {
     slack: slackAdapter,
   },
-  state: createMemoryState(),
+  state: createPostgresState({ url: process.env.DATABASE_URL }),
 });
 
 let initializationPromise: Promise<void> | null = null;
