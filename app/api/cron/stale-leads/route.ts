@@ -44,7 +44,15 @@ export async function GET(request: Request) {
     .from("leads")
     .select("*, assigned_agent:agents(*)")
     .lt("last_contacted_at", sevenDaysAgoIso)
-    .not("status", "in", `(${LEAD_STATUS_VALUES.filter((s) => s === "closed_won" || s === "closed_lost").map((s) => `"${s}"`).join(",")})`)
+    .not(
+      "status",
+      "in",
+      `(${LEAD_STATUS_VALUES.filter(
+        (s) => s === "closed_won" || s === "closed_lost",
+      )
+        .map((s) => `"${s}"`)
+        .join(",")})`,
+    )
     .order("last_contacted_at", { ascending: true });
   const staleLeads = rawLeads as
     | (Lead & { assigned_agent: Agent | null })[]

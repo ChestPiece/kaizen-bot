@@ -5,8 +5,7 @@ export async function executeUpdateLeadStatus(
   args: UpdateLeadStatusArgs,
   agentId: string,
 ): Promise<
-  | { success: true; lead: Lead; warning?: string }
-  | { error: string }
+  { success: true; lead: Lead; warning?: string } | { error: string }
 > {
   try {
     console.info("tool:updateLeadStatus:start", {

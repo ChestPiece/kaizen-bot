@@ -38,7 +38,10 @@ function sanitizeForLog(input: unknown): unknown {
   }
 
   if (input && typeof input === "object") {
-    const entries = Object.entries(input as Record<string, unknown>).slice(0, 20);
+    const entries = Object.entries(input as Record<string, unknown>).slice(
+      0,
+      20,
+    );
     return Object.fromEntries(
       entries.map(([key, value]) => [key, sanitizeForLog(value)]),
     );
