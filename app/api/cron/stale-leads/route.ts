@@ -17,6 +17,8 @@ function timeoutAfter(ms: number, label: string): Promise<never> {
 }
 
 export async function GET(request: Request) {
+  console.info("cron:stale-leads:start");
+
   // Verify cron secret — fail closed if CRON_SECRET is not configured
   if (!process.env.CRON_SECRET) {
     console.error("cron:stale-leads:error CRON_SECRET is not set");
@@ -31,6 +33,7 @@ export async function GET(request: Request) {
     timingSafeEqual(providedBuffer, expectedBuffer);
 
   if (!isAuthorized) {
+    console.warn("cron:stale-leads:unauthorized");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -48,10 +51,12 @@ export async function GET(request: Request) {
     | null;
 
   if (error) {
+    console.error("cron:stale-leads:error", { error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   if (!staleLeads || staleLeads.length === 0) {
+    console.info("cron:stale-leads:success", { notified: 0, staleLeads: 0 });
     return NextResponse.json({ ok: true, notified: 0 });
   }
 
@@ -108,9 +113,16 @@ export async function GET(request: Request) {
       notified++;
     } else {
       const agent = Array.from(byAgent.values())[i].agent;
-      console.error("Failed to DM agent", agent.slack_user_id, result.reason);
+      console.error("cron:stale-leads:dm-failed", {
+        slackUserId: agent.slack_user_id,
+        reason: String(result.reason),
+      });
     }
   }
 
+  console.info("cron:stale-leads:success", {
+    notified,
+    staleLeads: staleLeads.length,
+  });
   return NextResponse.json({ ok: true, notified });
 }

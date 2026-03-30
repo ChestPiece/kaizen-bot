@@ -4,7 +4,10 @@ import type { UpdateLeadStatusArgs, Lead } from "@/types";
 export async function executeUpdateLeadStatus(
   args: UpdateLeadStatusArgs,
   agentId: string,
-): Promise<{ success: boolean; lead: Lead } | { error: string }> {
+): Promise<
+  | { success: true; lead: Lead; warning?: string }
+  | { error: string }
+> {
   try {
     console.info("tool:updateLeadStatus:start", {
       agentId,
@@ -46,13 +49,17 @@ export async function executeUpdateLeadStatus(
       });
 
       if (noteError) {
+        const warning = `Lead status updated, but failed to save reason note: ${noteError.message}`;
         console.error("tool:updateLeadStatus:error", {
           agentId,
           leadId: args.lead_id,
-          error: `Lead status updated, but failed to save reason note: ${noteError.message}`,
+          error: warning,
+          partialSuccess: true,
         });
         return {
-          error: `Lead status updated, but failed to save reason note: ${noteError.message}`,
+          success: true,
+          lead: lead as Lead,
+          warning,
         };
       }
     }

@@ -7,9 +7,14 @@ import { supabase, getAgentBySlackId } from "./supabase";
 import { tools } from "./tools";
 import type { CoreMessage } from "@/types";
 
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error("Missing required environment variable: OPENAI_API_KEY");
+}
+
 const openai = createOpenAI({
-  baseURL: "https://ai-gateway.vercel.sh/v1/openai",
+  apiKey: process.env.OPENAI_API_KEY,
 });
+const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 const MAX_THREAD_HISTORY = 20;
 
 const CoreMessageSchema = z.object({
@@ -22,6 +27,25 @@ const MessageHistorySchema = z.array(CoreMessageSchema);
 const ThreadStateSchema = z.object({
   message_history: MessageHistorySchema,
 });
+
+function sanitizeForLog(input: unknown): unknown {
+  if (typeof input === "string") {
+    return input.length > 300 ? `${input.slice(0, 300)}...` : input;
+  }
+
+  if (Array.isArray(input)) {
+    return input.slice(0, 10).map((item) => sanitizeForLog(item));
+  }
+
+  if (input && typeof input === "object") {
+    const entries = Object.entries(input as Record<string, unknown>).slice(0, 20);
+    return Object.fromEntries(
+      entries.map(([key, value]) => [key, sanitizeForLog(value)]),
+    );
+  }
+
+  return input;
+}
 
 const SYSTEM_PROMPT = (agentName: string, agentRole: string, today: string) =>
   `
@@ -85,10 +109,11 @@ export async function runAgent({
 
   const parsedThreadState = ThreadStateSchema.safeParse(rawThreadState);
   if (!parsedThreadState.success && rawThreadState) {
-    console.warn(
-      "Invalid thread message history shape. Resetting history for thread:",
+    console.warn("agent:history:invalid", {
       threadId,
-    );
+      issues: parsedThreadState.error.issues,
+      rawThreadState: sanitizeForLog(rawThreadState),
+    });
   }
 
   const history: CoreMessage[] = parsedThreadState.success
@@ -110,7 +135,7 @@ export async function runAgent({
   });
 
   const agentModel = new ToolLoopAgent({
-    model: openai("openai/gpt-5.4-pro"),
+    model: openai(OPENAI_MODEL),
     instructions: SYSTEM_PROMPT(agent.full_name, agent.role, today),
     tools,
     experimental_context: { agentId: agent.id },
@@ -123,7 +148,7 @@ export async function runAgent({
   await thread.startTyping();
   await thread.post(result.fullStream);
 
-  // Save updated history (cap at 20 messages)
+  // Save updated history with a bounded rolling window.
   const responseMessages = await result.response;
 
   const parsedResponseHistory = MessageHistorySchema.safeParse(

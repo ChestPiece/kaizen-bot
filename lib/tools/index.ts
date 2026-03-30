@@ -29,6 +29,7 @@ const searchLeads = tool({
   inputSchema: z.object({
     query: z
       .string()
+      .max(120)
       .optional()
       .describe(
         "Name or phone number to search for (case-insensitive partial match).",
@@ -43,6 +44,7 @@ const searchLeads = tool({
       .describe("Filter by property type."),
     area: z
       .string()
+      .max(120)
       .optional()
       .describe('Filter by preferred area (e.g. "Downtown", "JBR").'),
   }),
@@ -126,11 +128,12 @@ const createLead = tool({
       .positive()
       .describe("Budget in AED (e.g. 3000000 for 3M AED)."),
     preferred_areas: z
-      .array(z.string())
+      .array(z.string().max(120))
       .optional()
       .describe('List of preferred areas (e.g. ["Downtown", "JBR"]).'),
     source: z
       .string()
+      .max(120)
       .optional()
       .describe(
         'How the lead was acquired (e.g. "referral", "website", "Instagram").',

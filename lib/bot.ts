@@ -95,7 +95,20 @@ let initializationPromise: Promise<void> | null = null;
 
 export function ensureBotInitialized(): Promise<void> {
   if (!initializationPromise) {
-    initializationPromise = bot.initialize();
+    console.info("bot:init:start", { slackMode });
+    initializationPromise = bot
+      .initialize()
+      .then(() => {
+        console.info("bot:init:success", { slackMode });
+      })
+      .catch((error) => {
+        console.error("bot:init:error", {
+          slackMode,
+          error: String(error),
+        });
+        initializationPromise = null;
+        throw error;
+      });
   }
 
   return initializationPromise;
