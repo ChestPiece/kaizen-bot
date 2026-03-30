@@ -1,14 +1,15 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, stepCountIs } from "ai";
+import { ToolLoopAgent } from "ai";
 import type { ModelMessage } from "ai";
-import { fromFullStream } from "chat";
 import type { Thread } from "chat";
 import { z } from "zod";
 import { supabase, getAgentBySlackId } from "./supabase";
 import { tools } from "./tools";
 import type { CoreMessage } from "@/types";
 
-const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = createOpenAI({
+  baseURL: "https://ai-gateway.vercel.sh/v1/openai",
+});
 const MAX_THREAD_HISTORY = 20;
 
 const CoreMessageSchema = z.object({
@@ -108,17 +109,19 @@ export async function runAgent({
     day: "numeric",
   });
 
-  const result = await streamText({
-    model: openai("gpt-4o"),
-    system: SYSTEM_PROMPT(agent.full_name, agent.role, today),
-    messages: messages as ModelMessage[],
+  const agentModel = new ToolLoopAgent({
+    model: openai("openai/gpt-5.4-pro"),
+    instructions: SYSTEM_PROMPT(agent.full_name, agent.role, today),
     tools,
-    stopWhen: stepCountIs(5),
     experimental_context: { agentId: agent.id },
   });
 
+  const result = await agentModel.stream({
+    messages: messages as ModelMessage[],
+  });
+
   await thread.startTyping();
-  await thread.post(fromFullStream(result.fullStream));
+  await thread.post(result.fullStream);
 
   // Save updated history (cap at 20 messages)
   const responseMessages = await result.response;
