@@ -20,7 +20,18 @@
       "Bash(vercel logs:*)",
       "Bash(vercel env:*)",
       "Bash(vercel --prod)",
-      "mcp__5b8fb26f-9472-4938-a53c-e49623d8a902__slack_send_message"
+      "mcp__5b8fb26f-9472-4938-a53c-e49623d8a902__slack_send_message",
+      "Bash(grep -E \"\\(^[^/]*\\\\.json$|/app/|/lib/|/src/|config|tsconfig|package\\\\.json\\)\")",
+      "Bash(find /c/Users/Anas/Desktop/Development/Agents/kaizen-bot -maxdepth 1 -type f \\\\\\(-name .env* -o -name *.md -o -name .gitignore \\\\\\))",
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|HACK\\\\|BUG\\\\|XXX\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot --include=*.ts --include=*.tsx --include=*.js)",
+      "Bash(grep -r \"try\\\\|catch\\\\|throw\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot/lib --include=*.ts)",
+      "Bash(grep -r console. /c/Users/Anas/Desktop/Development/Agents/kaizen-bot/lib --include=*.ts)",
+      "Bash(grep -r \"error\\\\|Error\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot/app --include=*.ts)",
+      "Bash(grep -r \"SECRET\\\\|PASSWORD\\\\|TOKEN\\\\|KEY\\\\|CREDENTIAL\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot --include=*.ts --include=*.tsx)",
+      "Bash(grep -r \"async\\\\|await\\\\|Promise\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot/lib --include=*.ts)",
+      "Bash(grep -rn \"hardcode\\\\|HARDCODE\\\\|localhost\\\\|127.0.0.1\\\\|0.0.0.0\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot --include=*.ts --include=*.tsx)",
+      "Bash(npx tsx:*)",
+      "Bash(npm list:*)"
     ]
   }
 }
