@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { embed, leadEmbedText } from "@/lib/embeddings";
 import type { CreateLeadArgs, Lead } from "@/types";
 
 export async function executeCreateLead(
@@ -42,6 +43,29 @@ export async function executeCreateLead(
         error: error?.message ?? "Failed to create lead",
       });
       return { error: error?.message ?? "Failed to create lead" };
+    }
+
+    // Generate and store embedding so this lead is findable via match_leads
+    try {
+      const embedding = await embed(
+        leadEmbedText({
+          full_name: args.full_name,
+          property_type: args.property_type,
+          intent: args.intent,
+          budget_aed: args.budget_aed,
+          preferred_areas: args.preferred_areas ?? [],
+          nationality: args.nationality,
+        }),
+      );
+      await supabase
+        .from("lead_embeddings")
+        .insert({ lead_id: (lead as Lead).id, embedding });
+    } catch (embErr) {
+      // Non-fatal: lead is created, embedding will just be missing
+      console.warn("tool:createLead:embedding_failed", {
+        leadId: (lead as Lead).id,
+        error: String(embErr),
+      });
     }
 
     console.info("tool:createLead:success", {

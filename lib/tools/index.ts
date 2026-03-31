@@ -6,6 +6,7 @@ import { executeGetLeadDetail } from "./get-lead-detail";
 import { executeUpdateLeadStatus } from "./update-lead-status";
 import { executeAddNote } from "./add-note";
 import { executeCreateLead } from "./create-lead";
+import { executeSearchProperties } from "./search-properties";
 import { LEAD_STATUS_VALUES } from "@/types";
 
 const getMyLeads = tool({
@@ -145,6 +146,34 @@ const createLead = tool({
   },
 });
 
+const searchProperties = tool({
+  description:
+    "Use when an agent wants to find available property listings that match a client's requirements — e.g. '2 bedroom apartment in Dubai Marina', 'villa on Palm Jumeirah under 20M', 'commercial unit for investment in Business Bay'. Performs semantic similarity search across all listings.",
+  inputSchema: z.object({
+    query: z
+      .string()
+      .min(1)
+      .max(300)
+      .describe(
+        "Natural-language description of what the client is looking for (location, bedrooms, budget, property type, etc.).",
+      ),
+    intent: z
+      .enum(["buy", "rent", "invest"])
+      .optional()
+      .describe("Filter by intent. Omit to search across all intents."),
+    match_count: z
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .optional()
+      .describe("Number of results to return (default 5)."),
+  }),
+  execute: async (args) => {
+    return executeSearchProperties(args);
+  },
+});
+
 export const tools = {
   getMyLeads,
   searchLeads,
@@ -152,4 +181,5 @@ export const tools = {
   updateLeadStatus,
   addNote,
   createLead,
+  searchProperties,
 };

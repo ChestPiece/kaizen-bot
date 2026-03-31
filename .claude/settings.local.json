@@ -29,7 +29,9 @@
       "Bash(grep -r \"error\\\\|Error\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot/app --include=*.ts)",
       "Bash(grep -r \"SECRET\\\\|PASSWORD\\\\|TOKEN\\\\|KEY\\\\|CREDENTIAL\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot --include=*.ts --include=*.tsx)",
       "Bash(grep -r \"async\\\\|await\\\\|Promise\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot/lib --include=*.ts)",
-      "Bash(grep -rn \"hardcode\\\\|HARDCODE\\\\|localhost\\\\|127.0.0.1\\\\|0.0.0.0\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot --include=*.ts --include=*.tsx)"
+      "Bash(grep -rn \"hardcode\\\\|HARDCODE\\\\|localhost\\\\|127.0.0.1\\\\|0.0.0.0\" /c/Users/Anas/Desktop/Development/Agents/kaizen-bot --include=*.ts --include=*.tsx)",
+      "Bash(npx tsx:*)",
+      "Bash(npm list:*)"
     ]
   }
 }

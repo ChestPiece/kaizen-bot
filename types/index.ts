@@ -74,6 +74,23 @@ export interface CoreMessage {
   content: string | unknown[];
 }
 
+export interface Property {
+  id: string;
+  title: string;
+  description: string | null;
+  property_type: PropertyType;
+  intent: LeadIntent;
+  area: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  size_sqft: number | null;
+  price_aed: number;
+  amenities: string[];
+  status: "available" | "reserved" | "sold" | "rented";
+  listed_by: string | null;
+  created_at: string;
+}
+
 // ─── Tool argument interfaces ──────────────────────────────────────────────────
 
 export interface GetMyLeadsArgs {
