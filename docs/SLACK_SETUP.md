@@ -74,6 +74,7 @@ Required in all modes:
 - OPENAI_API_KEY
 - NEXT_PUBLIC_SUPABASE_URL
 - SUPABASE_SERVICE_ROLE_KEY
+- DATABASE_URL
 - CRON_SECRET
 
 Single-workspace only:
@@ -129,6 +130,6 @@ Re-run install flow for that workspace and verify callback completes.
 - Rotate Slack secrets on incident or staff offboarding.
 - Add structured logs for webhook errors and OAuth failures.
 
-## Current Limitation
+## State Persistence
 
-Chat state persistence still uses in-memory state in this repository. For production-grade resilience across restarts, migrate to a persistent Chat SDK state adapter (Redis/Postgres).
+This repository uses Chat SDK PostgreSQL state storage for thread subscriptions and adapter state. Set `DATABASE_URL` to your Supabase transaction pooler connection string so subscribed threads survive restarts and cold starts.

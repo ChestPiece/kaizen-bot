@@ -6,19 +6,22 @@ export async function executeSearchLeads(
   agentId: string,
 ): Promise<{ leads: Lead[] } | { error: string }> {
   try {
+    const assignedOnly = args.assigned_only ?? false;
+
     console.info("tool:searchLeads:start", {
       agentId,
+      assignedOnly,
       hasQuery: Boolean(args.query),
       status: args.status ?? null,
       propertyType: args.property_type ?? null,
       area: args.area ?? null,
     });
 
-    let query = supabase
-      .from("leads")
-      .select("*")
-      .eq("assigned_to", agentId)
-      .limit(20);
+    let query = supabase.from("leads").select("*").limit(20);
+
+    if (assignedOnly) {
+      query = query.eq("assigned_to", agentId);
+    }
 
     if (args.query) {
       const safeQuery = args.query.replace(/[,%()]/g, "");
@@ -46,7 +49,11 @@ export async function executeSearchLeads(
     }
 
     const leads = (data as Lead[]) ?? [];
-    console.info("tool:searchLeads:success", { agentId, count: leads.length });
+    console.info("tool:searchLeads:success", {
+      agentId,
+      assignedOnly,
+      count: leads.length,
+    });
     return { leads };
   } catch (err) {
     console.error("tool:searchLeads:exception", {

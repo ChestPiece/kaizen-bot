@@ -9,24 +9,56 @@ import { executeCreateLead } from "./create-lead";
 import { executeSearchProperties } from "./search-properties";
 import { LEAD_STATUS_VALUES } from "@/types";
 
+function getAgentIdFromContext(
+  context: unknown,
+): { agentId: string } | { error: string } {
+  const parsedContext = z
+    .object({
+      agentId: z.string().uuid(),
+    })
+    .safeParse(context);
+
+  if (!parsedContext.success) {
+    return {
+      error:
+        "Missing or invalid tool context. Please retry the request in the same Slack thread.",
+    };
+  }
+
+  return { agentId: parsedContext.data.agentId };
+}
+
 const getMyLeads = tool({
   description:
-    "Use when the agent asks about their own leads, pipeline, follow-ups, or how many clients they have. Returns leads assigned to the calling agent, sorted by least recently contacted first.",
+    "Use when the agent asks to view leads, pipeline, follow-ups, or client count. By default this returns team leads. Set assigned_only=true only when the user explicitly asks for leads assigned to themselves.",
   inputSchema: z.object({
     status: z
       .enum(LEAD_STATUS_VALUES)
       .optional()
-      .describe("Filter by lead status. Omit to get all statuses."),
+      .describe(
+        "Filter by lead status only when the user explicitly asks for a status.",
+      ),
+    assigned_only: z
+      .boolean()
+      .optional()
+      .describe(
+        "Set true only when user asks for only their assigned leads. Default false (team-wide).",
+      ),
   }),
   execute: async (args, { experimental_context }) => {
-    const { agentId } = experimental_context as { agentId: string };
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) {
+      return contextResult;
+    }
+
+    const { agentId } = contextResult;
     return executeGetMyLeads(args, agentId);
   },
 });
 
 const searchLeads = tool({
   description:
-    "Use when searching for a specific lead by name or phone number, or filtering your own leads by status, property type, or area. Use this when the agent mentions a specific person or wants to find leads matching criteria.",
+    "Use when searching for leads by name, phone, status, property type, or area. By default this searches team leads. Set assigned_only=true only if user explicitly asks for only their assigned leads.",
   inputSchema: z.object({
     query: z
       .string()
@@ -48,9 +80,20 @@ const searchLeads = tool({
       .max(120)
       .optional()
       .describe('Filter by preferred area (e.g. "Downtown", "JBR").'),
+    assigned_only: z
+      .boolean()
+      .optional()
+      .describe(
+        "Set true only when user asks for only their assigned leads. Default false (team-wide).",
+      ),
   }),
   execute: async (args, { experimental_context }) => {
-    const { agentId } = experimental_context as { agentId: string };
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) {
+      return contextResult;
+    }
+
+    const { agentId } = contextResult;
     return executeSearchLeads(args, agentId);
   },
 });
@@ -62,7 +105,12 @@ const getLeadDetail = tool({
     lead_id: z.string().uuid().describe("UUID of the lead to retrieve."),
   }),
   execute: async (args, { experimental_context }) => {
-    const { agentId } = experimental_context as { agentId: string };
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) {
+      return contextResult;
+    }
+
+    const { agentId } = contextResult;
     return executeGetLeadDetail(args, agentId);
   },
 });
@@ -84,7 +132,12 @@ const updateLeadStatus = tool({
       ),
   }),
   execute: async (args, { experimental_context }) => {
-    const { agentId } = experimental_context as { agentId: string };
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) {
+      return contextResult;
+    }
+
+    const { agentId } = contextResult;
     return executeUpdateLeadStatus(args, agentId);
   },
 });
@@ -97,7 +150,12 @@ const addNote = tool({
     content: z.string().min(1).max(2000).describe("The note content to save."),
   }),
   execute: async (args, { experimental_context }) => {
-    const { agentId } = experimental_context as { agentId: string };
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) {
+      return contextResult;
+    }
+
+    const { agentId } = contextResult;
     return executeAddNote(args, agentId);
   },
 });
@@ -141,7 +199,12 @@ const createLead = tool({
       ),
   }),
   execute: async (args, { experimental_context }) => {
-    const { agentId } = experimental_context as { agentId: string };
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) {
+      return contextResult;
+    }
+
+    const { agentId } = contextResult;
     return executeCreateLead(args, agentId);
   },
 });

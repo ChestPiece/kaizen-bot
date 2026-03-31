@@ -95,6 +95,7 @@ export interface Property {
 
 export interface GetMyLeadsArgs {
   status?: LeadStatus;
+  assigned_only?: boolean;
 }
 
 export interface SearchLeadsArgs {
@@ -102,6 +103,7 @@ export interface SearchLeadsArgs {
   status?: LeadStatus;
   property_type?: PropertyType;
   area?: string;
+  assigned_only?: boolean;
 }
 
 export interface GetLeadDetailArgs {
