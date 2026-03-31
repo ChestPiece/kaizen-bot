@@ -53,4 +53,4 @@ Full setup instructions, OAuth install flow, required scopes, env matrix, and tr
 
 - Runtime: Node.js route handlers.
 - Cron auth uses Authorization: Bearer <CRON_SECRET>.
-- Production should use persistent Chat SDK state storage.
+- Chat SDK state is persisted in PostgreSQL via `DATABASE_URL`.

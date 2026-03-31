@@ -1,6 +1,6 @@
 import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
-import { createMemoryState } from "@chat-adapter/state-memory";
+import { createPostgresState } from "@chat-adapter/state-pg";
 import { runAgent } from "./agent";
 
 const {
@@ -16,6 +16,10 @@ if (!SLACK_SIGNING_SECRET) {
   throw new Error(
     "Missing required environment variable: SLACK_SIGNING_SECRET",
   );
+}
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("Missing required environment variable: DATABASE_URL");
 }
 
 const hasSingleWorkspaceConfig = Boolean(SLACK_BOT_TOKEN);
@@ -88,7 +92,7 @@ export const bot = new Chat({
   adapters: {
     slack: slackAdapter,
   },
-  state: createMemoryState(),
+  state: createPostgresState(),
 });
 
 let initializationPromise: Promise<void> | null = null;

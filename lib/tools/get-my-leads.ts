@@ -6,17 +6,23 @@ export async function executeGetMyLeads(
   agentId: string,
 ): Promise<{ leads: Lead[] } | { error: string }> {
   try {
+    const assignedOnly = args.assigned_only ?? false;
+
     console.info("tool:getMyLeads:start", {
       agentId,
+      assignedOnly,
       status: args.status ?? null,
     });
 
     let query = supabase
       .from("leads")
       .select("*")
-      .eq("assigned_to", agentId)
       .order("last_contacted_at", { ascending: true }) // oldest contact first = most urgent
       .limit(50);
+
+    if (assignedOnly) {
+      query = query.eq("assigned_to", agentId);
+    }
 
     if (args.status) {
       query = query.eq("status", args.status);
@@ -30,7 +36,12 @@ export async function executeGetMyLeads(
     }
 
     const leads = (data as Lead[]) ?? [];
-    console.info("tool:getMyLeads:success", { agentId, count: leads.length });
+    console.info("tool:getMyLeads:success", {
+      agentId,
+      assignedOnly,
+      status: args.status ?? null,
+      count: leads.length,
+    });
     return { leads };
   } catch (err) {
     console.error("tool:getMyLeads:exception", { agentId, error: String(err) });
