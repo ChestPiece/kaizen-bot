@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { bot } from "@/lib/bot";
+import { bot, ensureBotInitialized } from "@/lib/bot";
 
 export const runtime = "nodejs";
 
@@ -8,6 +8,24 @@ export async function POST(
   { params }: { params: Promise<{ platform: string }> },
 ) {
   const { platform } = await params;
+
+  // Deduplicate Slack retries triggered by slow responses
+  if (platform === "slack") {
+    const retryNum = request.headers.get("x-slack-retry-num");
+    const retryReason = request.headers.get("x-slack-retry-reason");
+    if (retryNum && retryReason === "http_timeout") {
+      console.info("webhook:slack:retry-skipped", { retryNum });
+      return new Response("OK", { status: 200 });
+    }
+  }
+
+  try {
+    await ensureBotInitialized();
+  } catch (err) {
+    console.error("bot:init:failed", { error: String(err) });
+    return new Response("Service Unavailable", { status: 503 });
+  }
+
   const webhookHandler = (
     bot.webhooks as Record<
       string,
