@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { bot, ensureBotInitialized } from "@/lib/bot";
+import { bot } from "@/lib/bot";
 
 export const runtime = "nodejs";
 
@@ -18,12 +18,6 @@ export async function POST(
       return new Response("OK", { status: 200 });
     }
   }
-
-  // Kick off initialization in the background — don't block webhook processing.
-  // If init fails (e.g. state DB unreachable), log it but still handle the event.
-  ensureBotInitialized().catch((err) => {
-    console.error("bot:init:failed", { error: String(err) });
-  });
 
   const webhookHandler = (
     bot.webhooks as Record<
