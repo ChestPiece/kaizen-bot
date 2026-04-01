@@ -19,12 +19,11 @@ export async function POST(
     }
   }
 
-  try {
-    await ensureBotInitialized();
-  } catch (err) {
+  // Kick off initialization in the background — don't block webhook processing.
+  // If init fails (e.g. state DB unreachable), log it but still handle the event.
+  ensureBotInitialized().catch((err) => {
     console.error("bot:init:failed", { error: String(err) });
-    return new Response("Service Unavailable", { status: 503 });
-  }
+  });
 
   const webhookHandler = (
     bot.webhooks as Record<
