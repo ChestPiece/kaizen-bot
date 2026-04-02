@@ -22,15 +22,6 @@ export async function POST(
     );
   }
 
-  // Handle Slack URL verification challenge before signature checks
-  if (platform === "slack") {
-    const cloned = request.clone();
-    const body = await cloned.json().catch(() => null);
-    if (body?.type === "url_verification") {
-      return Response.json({ challenge: body.challenge });
-    }
-  }
-
   return webhookHandler(request, {
     waitUntil: (task: Promise<unknown>) => after(() => task),
   });

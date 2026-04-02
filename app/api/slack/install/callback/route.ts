@@ -1,7 +1,24 @@
 import { NextResponse } from "next/server";
 import { ensureBotInitialized, slackAdapter, slackMode } from "@/lib/bot";
+import { toLogError } from "@/lib/safe-error";
 
 export const runtime = "nodejs";
+
+function readCookieValue(
+  cookieHeader: string | null,
+  name: string,
+): string | null {
+  if (!cookieHeader) return null;
+
+  for (const raw of cookieHeader.split(";")) {
+    const entry = raw.trim();
+    if (entry.startsWith(`${name}=`)) {
+      return decodeURIComponent(entry.slice(name.length + 1));
+    }
+  }
+
+  return null;
+}
 
 export async function GET(request: Request) {
   if (slackMode !== "multi-workspace") {
@@ -15,12 +32,10 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const requestState = url.searchParams.get("state");
-  const cookieState = request.headers
-    .get("cookie")
-    ?.split(";")
-    .map((item) => item.trim())
-    .find((item) => item.startsWith("slack_oauth_state="))
-    ?.split("=")[1];
+  const cookieState = readCookieValue(
+    request.headers.get("cookie"),
+    "slack_oauth_state",
+  );
 
   if (!requestState || !cookieState || requestState !== cookieState) {
     return new NextResponse("Invalid OAuth state. Please retry installation.", {
@@ -30,13 +45,14 @@ export async function GET(request: Request) {
 
   try {
     await ensureBotInitialized();
-    const callbackUrl = new URL(request.url)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? callbackUrl.origin
-    const redirectUri = process.env.SLACK_REDIRECT_URI ?? `${baseUrl}/api/slack/install/callback`
-    callbackUrl.searchParams.set('redirect_uri', redirectUri)
+    const callbackUrl = new URL(request.url);
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? callbackUrl.origin;
+    const redirectUri =
+      process.env.SLACK_REDIRECT_URI ?? `${baseUrl}/api/slack/install/callback`;
+    callbackUrl.searchParams.set("redirect_uri", redirectUri);
 
-    const callbackRequest = new Request(callbackUrl.toString(), request)
-    const { teamId } = await slackAdapter.handleOAuthCallback(callbackRequest)
+    const callbackRequest = new Request(callbackUrl.toString(), request);
+    const { teamId } = await slackAdapter.handleOAuthCallback(callbackRequest);
 
     const response = new NextResponse(
       `Slack app installed for team ${teamId}. You can now return to Slack.`,
@@ -54,7 +70,9 @@ export async function GET(request: Request) {
 
     return response;
   } catch (error) {
-    console.error("[slack/install/callback] OAuth installation failed", error);
+    console.error("[slack/install/callback] OAuth installation failed", {
+      error: toLogError(error),
+    });
     return new NextResponse(
       "Slack OAuth installation failed. Check server logs for details.",
       {
