@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { embed } from "@/lib/embeddings";
+import { toLogError, toToolErrorMessage } from "@/lib/safe-error";
 
 export interface SearchPropertiesArgs {
   query: string;
@@ -27,7 +28,8 @@ export async function executeSearchProperties(
 ): Promise<{ properties: PropertyResult[] } | { error: string }> {
   try {
     console.info("tool:searchProperties:start", {
-      query: args.query,
+      hasQuery: Boolean(args.query),
+      queryLength: args.query.length,
       intent: args.intent ?? null,
       match_count: args.match_count ?? 5,
     });
@@ -42,15 +44,19 @@ export async function executeSearchProperties(
     });
 
     if (error) {
-      console.error("tool:searchProperties:error", { error: error.message });
-      return { error: error.message };
+      console.error("tool:searchProperties:error", {
+        error: toLogError(error),
+      });
+      return { error: toToolErrorMessage() };
     }
 
     const properties = (data as PropertyResult[]) ?? [];
     console.info("tool:searchProperties:success", { count: properties.length });
     return { properties };
   } catch (err) {
-    console.error("tool:searchProperties:exception", { error: String(err) });
-    return { error: String(err) };
+    console.error("tool:searchProperties:exception", {
+      error: toLogError(err),
+    });
+    return { error: toToolErrorMessage() };
   }
 }

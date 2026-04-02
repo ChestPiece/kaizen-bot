@@ -2,6 +2,7 @@ import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createPostgresState } from "@chat-adapter/state-pg";
 import { runAgent } from "./agent";
+import { toLogError } from "./safe-error";
 
 const {
   SLACK_BOT_TOKEN,
@@ -108,7 +109,7 @@ export function ensureBotInitialized(): Promise<void> {
       .catch((error) => {
         console.error("bot:init:error", {
           slackMode,
-          error: String(error),
+          error: toLogError(error),
         });
         initializationPromise = null;
         throw error;

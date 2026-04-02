@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { toLogError, toToolErrorMessage } from "@/lib/safe-error";
 import type { GetMyLeadsArgs, Lead } from "@/types";
 
 export async function executeGetMyLeads(
@@ -31,8 +32,11 @@ export async function executeGetMyLeads(
     const { data, error } = await query;
 
     if (error) {
-      console.error("tool:getMyLeads:error", { agentId, error: error.message });
-      return { error: error.message };
+      console.error("tool:getMyLeads:error", {
+        agentId,
+        error: toLogError(error),
+      });
+      return { error: toToolErrorMessage() };
     }
 
     const leads = (data as Lead[]) ?? [];
@@ -44,7 +48,10 @@ export async function executeGetMyLeads(
     });
     return { leads };
   } catch (err) {
-    console.error("tool:getMyLeads:exception", { agentId, error: String(err) });
-    return { error: String(err) };
+    console.error("tool:getMyLeads:exception", {
+      agentId,
+      error: toLogError(err),
+    });
+    return { error: toToolErrorMessage() };
   }
 }

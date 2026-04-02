@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { toLogError, toToolErrorMessage } from "@/lib/safe-error";
 import type { UpdateLeadStatusArgs, Lead } from "@/types";
 
 export async function executeUpdateLeadStatus(
@@ -29,11 +30,11 @@ export async function executeUpdateLeadStatus(
       const message =
         updateError?.code === "PGRST116"
           ? "Lead not found or not assigned to you"
-          : (updateError?.message ?? "Failed to update lead");
+          : "Failed to update lead";
       console.error("tool:updateLeadStatus:error", {
         agentId,
         leadId: args.lead_id,
-        error: message,
+        error: toLogError(updateError) || message,
       });
       return { error: message };
     }
@@ -48,11 +49,12 @@ export async function executeUpdateLeadStatus(
       });
 
       if (noteError) {
-        const warning = `Lead status updated, but failed to save reason note: ${noteError.message}`;
+        const warning =
+          "Lead status updated, but failed to save the reason note.";
         console.error("tool:updateLeadStatus:error", {
           agentId,
           leadId: args.lead_id,
-          error: warning,
+          error: toLogError(noteError),
           partialSuccess: true,
         });
         return {
@@ -73,8 +75,8 @@ export async function executeUpdateLeadStatus(
     console.error("tool:updateLeadStatus:exception", {
       agentId,
       leadId: args.lead_id,
-      error: String(err),
+      error: toLogError(err),
     });
-    return { error: String(err) };
+    return { error: toToolErrorMessage() };
   }
 }

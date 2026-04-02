@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { toLogError, toToolErrorMessage } from "@/lib/safe-error";
 import type { SearchLeadsArgs, Lead } from "@/types";
 
 export async function executeSearchLeads(
@@ -43,9 +44,9 @@ export async function executeSearchLeads(
     if (error) {
       console.error("tool:searchLeads:error", {
         agentId,
-        error: error.message,
+        error: toLogError(error),
       });
-      return { error: error.message };
+      return { error: toToolErrorMessage() };
     }
 
     const leads = (data as Lead[]) ?? [];
@@ -58,8 +59,8 @@ export async function executeSearchLeads(
   } catch (err) {
     console.error("tool:searchLeads:exception", {
       agentId,
-      error: String(err),
+      error: toLogError(err),
     });
-    return { error: String(err) };
+    return { error: toToolErrorMessage() };
   }
 }

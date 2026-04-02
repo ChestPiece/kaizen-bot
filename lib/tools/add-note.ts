@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { toLogError, toToolErrorMessage } from "@/lib/safe-error";
 import type { AddNoteArgs, LeadNote } from "@/types";
 
 export async function executeAddNote(
@@ -30,16 +31,16 @@ export async function executeAddNote(
         console.error("tool:addNote:error", {
           agentId,
           leadId: args.lead_id,
-          error: message,
+          error: toLogError(noteError) || message,
         });
         return { error: "Lead not found or not assigned to you" };
       }
       console.error("tool:addNote:error", {
         agentId,
         leadId: args.lead_id,
-        error: message,
+        error: toLogError(noteError) || message,
       });
-      return { error: message };
+      return { error: toToolErrorMessage() };
     }
 
     console.info("tool:addNote:success", {
@@ -52,8 +53,8 @@ export async function executeAddNote(
     console.error("tool:addNote:exception", {
       agentId,
       leadId: args.lead_id,
-      error: String(err),
+      error: toLogError(err),
     });
-    return { error: String(err) };
+    return { error: toToolErrorMessage() };
   }
 }

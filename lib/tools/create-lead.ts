@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { embed, leadEmbedText } from "@/lib/embeddings";
+import { toLogError, toToolErrorMessage } from "@/lib/safe-error";
 import type { CreateLeadArgs, Lead } from "@/types";
 
 export async function executeCreateLead(
@@ -40,9 +41,9 @@ export async function executeCreateLead(
     if (error || !lead) {
       console.error("tool:createLead:error", {
         agentId,
-        error: error?.message ?? "Failed to create lead",
+        error: toLogError(error),
       });
-      return { error: error?.message ?? "Failed to create lead" };
+      return { error: toToolErrorMessage() };
     }
 
     // Generate and store embedding so this lead is findable via match_leads
@@ -64,7 +65,7 @@ export async function executeCreateLead(
       // Non-fatal: lead is created, embedding will just be missing
       console.warn("tool:createLead:embedding_failed", {
         leadId: (lead as Lead).id,
-        error: String(embErr),
+        error: toLogError(embErr),
       });
     }
 
@@ -74,7 +75,10 @@ export async function executeCreateLead(
     });
     return { success: true, lead: lead as Lead };
   } catch (err) {
-    console.error("tool:createLead:exception", { agentId, error: String(err) });
-    return { error: String(err) };
+    console.error("tool:createLead:exception", {
+      agentId,
+      error: toLogError(err),
+    });
+    return { error: toToolErrorMessage() };
   }
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { toLogError } from "@/lib/safe-error";
 import type { Agent } from "@/types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,7 +40,7 @@ export async function getAgentBySlackId(
       console.error("getAgentBySlackId: unexpected DB error", {
         slackUserId,
         code: error.code,
-        message: error.message,
+        message: toLogError(error),
       });
     }
     return null;

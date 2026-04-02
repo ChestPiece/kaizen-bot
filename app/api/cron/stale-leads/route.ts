@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { supabase } from "@/lib/supabase";
 import { bot } from "@/lib/bot";
+import { toApiErrorMessage, toLogError } from "@/lib/safe-error";
 import type { Lead, Agent } from "@/types";
 import { LEAD_STATUS_VALUES } from "@/types";
 
@@ -59,8 +60,8 @@ export async function GET(request: Request) {
     | null;
 
   if (error) {
-    console.error("cron:stale-leads:error", { error: error.message });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("cron:stale-leads:error", { error: toLogError(error) });
+    return NextResponse.json({ error: toApiErrorMessage() }, { status: 500 });
   }
 
   if (!staleLeads || staleLeads.length === 0) {
@@ -123,7 +124,7 @@ export async function GET(request: Request) {
       const agent = Array.from(byAgent.values())[i].agent;
       console.error("cron:stale-leads:dm-failed", {
         slackUserId: agent.slack_user_id,
-        reason: String(result.reason),
+        reason: toLogError(result.reason),
       });
     }
   }

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { toLogError, toToolErrorMessage } from "@/lib/safe-error";
 import type { GetLeadDetailArgs, LeadWithNotes } from "@/types";
 
 export async function executeGetLeadDetail(
@@ -16,14 +17,13 @@ export async function executeGetLeadDetail(
       .single();
 
     if (leadError || !lead) {
+      const message = "Lead not found or not assigned to you";
       console.error("tool:getLeadDetail:error", {
         agentId,
         leadId: args.lead_id,
-        error: leadError?.message ?? "Lead not found or not assigned to you",
+        error: toLogError(leadError) || message,
       });
-      return {
-        error: leadError?.message ?? "Lead not found or not assigned to you",
-      };
+      return { error: message };
     }
 
     const { data: notes, error: notesError } = await supabase
@@ -37,9 +37,9 @@ export async function executeGetLeadDetail(
       console.error("tool:getLeadDetail:error", {
         agentId,
         leadId: args.lead_id,
-        error: notesError.message,
+        error: toLogError(notesError),
       });
-      return { error: notesError.message };
+      return { error: toToolErrorMessage() };
     }
 
     console.info("tool:getLeadDetail:success", {
@@ -58,8 +58,8 @@ export async function executeGetLeadDetail(
     console.error("tool:getLeadDetail:exception", {
       agentId,
       leadId: args.lead_id,
-      error: String(err),
+      error: toLogError(err),
     });
-    return { error: String(err) };
+    return { error: toToolErrorMessage() };
   }
 }
