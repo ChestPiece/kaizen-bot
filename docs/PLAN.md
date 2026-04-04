@@ -255,3 +255,106 @@ Chat SDK singleton. Must be module-level — not inside a request handler.
 - Row-level security (RLS) in Supabase
 - Manager dashboard — view all agent pipelines
 - Analytics: conversion rates per agent, per area, per nationality
+
+---
+
+# Chat SDK Best Practices Audit — April 2026
+
+Findings from reviewing the codebase against Chat SDK v4.23.0 bundled docs
+(`node_modules/chat/docs/`). Five improvements identified. No schema changes,
+no behavior changes to business logic, no new environment variables.
+
+## Issues Found
+
+### 1. Missing `lib/system-prompt.ts` — CRITICAL (build blocker)
+
+`lib/agent.ts:8` imports `buildSystemPrompt` from `./system-prompt` but the
+file does not exist. The build will fail without it.
+
+**Fix:** Create `lib/system-prompt.ts` exporting:
+
+```typescript
+import type { Agent } from "@/types";
+export function buildSystemPrompt(agent: Agent): string { ... }
+```
+
+The system prompt should:
+- Personalize by `agent.full_name` and `agent.role`
+- List all 7 tools with when-to-use guidance
+- Establish Dubai real estate domain context (AED, key areas, intents)
+- Include operating guidelines (confirm before acting, search before creating)
+
+### 2. Webhook route unsafe type cast — HIGH
+
+`app/api/webhooks/[platform]/route.ts` lines 11–16 cast `bot.webhooks` to
+`Record<string, ...>`. The Chat SDK idiomatic pattern (from usage.mdx) is:
+
+```typescript
+// Before
+const webhookHandler = (bot.webhooks as Record<string, ...>)[platform];
+
+// After
+type Platform = keyof typeof bot.webhooks;
+const webhookHandler = bot.webhooks[platform as Platform];
+```
+
+### 3. No concurrency config on Chat instance — HIGH
+
+Default behavior drops messages that arrive while a tool loop is running
+(silent `LockError`). For a CRM bot with 10–30s tool chains, users lose
+follow-up messages. `onLockConflict` is `@deprecated` in v4.23.0.
+
+**Fix:** Add to the `Chat` constructor in `lib/bot.ts`:
+
+```typescript
+concurrency: "queue",   // queue follow-ups instead of dropping them
+dedupeTtlMs: 300_000,   // explicit (matches the 5-min default)
+```
+
+`"queue"` serializes messages per thread. The existing 2-argument handler
+signatures are backward-compatible (`context` param is optional).
+
+### 4. Tool context boilerplate — MEDIUM
+
+6 of 7 tools in `lib/tools/index.ts` repeat an identical 8-line block to
+extract `agentId` from `experimental_context`. Extract into a `withContext`
+wrapper:
+
+```typescript
+function withContext<TArgs>(
+  fn: (args: TArgs, agentId: string) => Promise<unknown>,
+) {
+  return async (args: TArgs, { experimental_context }: { experimental_context: unknown }) => {
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) return contextResult;
+    return fn(args, contextResult.agentId);
+  };
+}
+
+// Usage (replaces 8-line block per tool):
+execute: withContext((args, agentId) => executeGetMyLeads(args, agentId)),
+```
+
+Apply to: `getMyLeads`, `searchLeads`, `getLeadDetail`, `updateLeadStatus`,
+`addNote`, `createLead`.
+
+### 5. `searchProperties` undocumented inconsistency — MEDIUM
+
+`searchProperties` is the only tool that omits `experimental_context`. This
+is intentional (properties are global CRM inventory, not per-agent scoped)
+but looks like a bug without a comment.
+
+**Fix:** Add a comment to the `execute` block explaining the decision.
+
+## Implementation Order
+
+1. `lib/system-prompt.ts` (new file) — unblocks build
+2. `app/api/webhooks/[platform]/route.ts` + `lib/bot.ts` — Chat SDK patterns
+3. `lib/tools/index.ts` — `withContext` wrapper + `searchProperties` comment
+
+## Verification
+
+1. `npm run build` — must succeed
+2. @mention bot in Slack — confirm response
+3. Send follow-up mid-tool-loop — confirm it gets a response (not dropped)
+4. TypeScript: no errors on `bot.webhooks[platform as Platform]` or `withContext`
