@@ -36,11 +36,26 @@ npm run dev
 https://<your-ngrok-domain>/api/webhooks/slack
 ```
 
+5. Build the local code-review graph:
+
+```bash
+python -m code_review_graph build
+```
+
+6. Check graph status:
+
+```bash
+python -m code_review_graph status
+```
+
+Note: `python -m code_review_graph serve` is the MCP stdio server command and should be launched by your editor/tool host, not run manually in an interactive terminal.
+
 ## Slack Setup
 
 Full setup instructions, OAuth install flow, required scopes, env matrix, and troubleshooting are in:
 
 - docs/SLACK_SETUP.md
+- docs/CODE_REVIEW_GRAPH.md
 
 ## Key Routes
 

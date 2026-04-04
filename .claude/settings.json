@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "command": "python -m code_review_graph update",
+        "timeout": 5000
+      }
+    ],
+    "SessionStart": [
+      {
+        "command": "python -m code_review_graph status",
+        "timeout": 3000
+      }
+    ],
+    "PreCommit": [
+      {
+        "command": "python -m code_review_graph detect-changes --brief",
+        "timeout": 10000
+      }
+    ]
+  }
+}
