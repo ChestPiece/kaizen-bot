@@ -28,6 +28,19 @@ function getAgentIdFromContext(
   return { agentId: parsedContext.data.agentId };
 }
 
+function withContext<TArgs>(
+  fn: (args: TArgs, agentId: string) => Promise<unknown>,
+) {
+  return async (
+    args: TArgs,
+    { experimental_context }: { experimental_context: unknown },
+  ) => {
+    const contextResult = getAgentIdFromContext(experimental_context);
+    if ("error" in contextResult) return contextResult;
+    return fn(args, contextResult.agentId);
+  };
+}
+
 const getMyLeads = tool({
   description:
     "Use when the agent asks to view leads, pipeline, follow-ups, or client count. By default this returns team leads. Set assigned_only=true only when the user explicitly asks for leads assigned to themselves.",
@@ -45,15 +58,7 @@ const getMyLeads = tool({
         "Set true only when user asks for only their assigned leads. Default false (team-wide).",
       ),
   }),
-  execute: async (args, { experimental_context }) => {
-    const contextResult = getAgentIdFromContext(experimental_context);
-    if ("error" in contextResult) {
-      return contextResult;
-    }
-
-    const { agentId } = contextResult;
-    return executeGetMyLeads(args, agentId);
-  },
+  execute: withContext((args, agentId) => executeGetMyLeads(args, agentId)),
 });
 
 const searchLeads = tool({
@@ -87,15 +92,7 @@ const searchLeads = tool({
         "Set true only when user asks for only their assigned leads. Default false (team-wide).",
       ),
   }),
-  execute: async (args, { experimental_context }) => {
-    const contextResult = getAgentIdFromContext(experimental_context);
-    if ("error" in contextResult) {
-      return contextResult;
-    }
-
-    const { agentId } = contextResult;
-    return executeSearchLeads(args, agentId);
-  },
+  execute: withContext((args, agentId) => executeSearchLeads(args, agentId)),
 });
 
 const getLeadDetail = tool({
@@ -104,15 +101,7 @@ const getLeadDetail = tool({
   inputSchema: z.object({
     lead_id: z.string().uuid().describe("UUID of the lead to retrieve."),
   }),
-  execute: async (args, { experimental_context }) => {
-    const contextResult = getAgentIdFromContext(experimental_context);
-    if ("error" in contextResult) {
-      return contextResult;
-    }
-
-    const { agentId } = contextResult;
-    return executeGetLeadDetail(args, agentId);
-  },
+  execute: withContext((args, agentId) => executeGetLeadDetail(args, agentId)),
 });
 
 const updateLeadStatus = tool({
@@ -131,15 +120,7 @@ const updateLeadStatus = tool({
         "Optional reason for the status change. Will be saved as a note on the lead.",
       ),
   }),
-  execute: async (args, { experimental_context }) => {
-    const contextResult = getAgentIdFromContext(experimental_context);
-    if ("error" in contextResult) {
-      return contextResult;
-    }
-
-    const { agentId } = contextResult;
-    return executeUpdateLeadStatus(args, agentId);
-  },
+  execute: withContext((args, agentId) => executeUpdateLeadStatus(args, agentId)),
 });
 
 const addNote = tool({
@@ -149,15 +130,7 @@ const addNote = tool({
     lead_id: z.string().uuid().describe("UUID of the lead to add the note to."),
     content: z.string().min(1).max(2000).describe("The note content to save."),
   }),
-  execute: async (args, { experimental_context }) => {
-    const contextResult = getAgentIdFromContext(experimental_context);
-    if ("error" in contextResult) {
-      return contextResult;
-    }
-
-    const { agentId } = contextResult;
-    return executeAddNote(args, agentId);
-  },
+  execute: withContext((args, agentId) => executeAddNote(args, agentId)),
 });
 
 const createLead = tool({
@@ -198,15 +171,7 @@ const createLead = tool({
         'How the lead was acquired (e.g. "referral", "website", "Instagram").',
       ),
   }),
-  execute: async (args, { experimental_context }) => {
-    const contextResult = getAgentIdFromContext(experimental_context);
-    if ("error" in contextResult) {
-      return contextResult;
-    }
-
-    const { agentId } = contextResult;
-    return executeCreateLead(args, agentId);
-  },
+  execute: withContext((args, agentId) => executeCreateLead(args, agentId)),
 });
 
 const searchProperties = tool({
@@ -232,6 +197,8 @@ const searchProperties = tool({
       .optional()
       .describe("Number of results to return (default 5)."),
   }),
+  // Intentionally omits experimental_context: properties are global CRM
+  // inventory, not scoped to the calling agent. Any agent may search listings.
   execute: async (args) => {
     return executeSearchProperties(args);
   },
