@@ -94,6 +94,8 @@ export const bot = new Chat({
     slack: slackAdapter,
   },
   state: createPostgresState(),
+  concurrency: "queue",   // queue follow-up messages instead of dropping them during long tool loops
+  dedupeTtlMs: 300_000,   // explicit 5-min dedup window (matches SDK default)
 });
 
 let initializationPromise: Promise<void> | null = null;

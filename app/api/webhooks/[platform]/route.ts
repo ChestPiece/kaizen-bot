@@ -8,12 +8,8 @@ export async function POST(
   { params }: { params: Promise<{ platform: string }> },
 ) {
   const { platform } = await params;
-  const webhookHandler = (
-    bot.webhooks as Record<
-      string,
-      ((req: Request, opts: unknown) => Promise<Response>) | undefined
-    >
-  )[platform];
+  type Platform = keyof typeof bot.webhooks;
+  const webhookHandler = bot.webhooks[platform as Platform];
 
   if (!webhookHandler) {
     return Response.json(
