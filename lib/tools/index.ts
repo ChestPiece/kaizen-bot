@@ -28,14 +28,11 @@ function getAgentIdFromContext(
   return { agentId: parsedContext.data.agentId };
 }
 
-function withContext<TArgs>(
-  fn: (args: TArgs, agentId: string) => Promise<unknown>,
-) {
-  return async (
-    args: TArgs,
-    { experimental_context }: { experimental_context: unknown },
-  ) => {
-    const contextResult = getAgentIdFromContext(experimental_context);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withContext(fn: (args: any, agentId: string) => Promise<unknown>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return async (args: any, options: { experimental_context?: unknown }) => {
+    const contextResult = getAgentIdFromContext(options.experimental_context);
     if ("error" in contextResult) return contextResult;
     return fn(args, contextResult.agentId);
   };
