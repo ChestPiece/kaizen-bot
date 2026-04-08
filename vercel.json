@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/stale-leads",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/discord-gateway",
+      "schedule": "*/9 * * * *"
     }
   ]
 }
