@@ -35,11 +35,7 @@
     "com.code-review-graph/mcp": {
       "type": "stdio",
       "command": "python",
-      "args": [
-        "-m",
-        "code_review_graph",
-        "serve"
-      ]
+      "args": ["-m", "code_review_graph", "serve"]
     },
     "com.supabase/mcp": {
       "type": "http",
