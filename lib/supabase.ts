@@ -48,3 +48,31 @@ export async function getAgentBySlackId(
   if (!data) return null;
   return data as Agent;
 }
+
+/**
+ * Look up an internal agent record by their Discord user ID.
+ * Returns null if the Discord user has not been registered in the agents table.
+ */
+export async function getAgentByDiscordId(
+  discordUserId: string,
+): Promise<Agent | null> {
+  const { data, error } = await supabase
+    .from("agents")
+    .select("*")
+    .eq("discord_user_id", discordUserId)
+    .single();
+
+  if (error) {
+    if (error.code !== "PGRST116") {
+      // PGRST116 = no rows found; anything else is a connectivity or config issue
+      console.error("getAgentByDiscordId: unexpected DB error", {
+        discordUserId,
+        code: error.code,
+        message: toLogError(error),
+      });
+    }
+    return null;
+  }
+  if (!data) return null;
+  return data as Agent;
+}

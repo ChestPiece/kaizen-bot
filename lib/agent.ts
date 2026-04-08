@@ -3,7 +3,7 @@ import { ToolLoopAgent } from "ai";
 import type { ModelMessage } from "ai";
 import type { Thread } from "chat";
 import { z } from "zod";
-import { supabase, getAgentBySlackId } from "./supabase";
+import { supabase, getAgentByDiscordId, getAgentBySlackId } from "./supabase";
 import { tools } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
 import { toLogError } from "./safe-error";
@@ -18,6 +18,9 @@ const openai = createOpenAI({
 });
 const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 const MAX_THREAD_HISTORY = 20;
+const THREAD_STATE_TIMEOUT_MS = 5000;
+const THREAD_STATE_MAX_ATTEMPTS = 3;
+const THREAD_STATE_RETRY_BASE_DELAY_MS = 250;
 
 const CoreMessageSchema = z.object({
   role: z.enum(["user", "assistant", "system", "tool"]),
@@ -54,23 +57,137 @@ function sanitizeForLog(input: unknown): unknown {
 
 interface RunAgentParams {
   userMessage: string;
-  slackUserId: string;
+  userId: string;
+  platform: "slack" | "discord";
   threadId: string;
   thread: Thread;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableThreadStateError(err: unknown): boolean {
+  const message = String(toLogError(err));
+  return /(timeout|timed out|etimedout|econnreset|enotfound|eai_again|network|connect)/i.test(
+    message,
+  );
+}
+
+async function fetchThreadStateOnce(threadId: string): Promise<unknown> {
+  const { data, error } = await supabase
+    .from("thread_state")
+    .select("message_history")
+    .eq("thread_id", threadId)
+    .single();
+
+  if (error) {
+    // PGRST116 = no rows found
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  return data;
+}
+
+async function loadThreadStateWithRetry(
+  threadId: string,
+  runId: string,
+): Promise<unknown> {
+  for (let attempt = 1; attempt <= THREAD_STATE_MAX_ATTEMPTS; attempt++) {
+    const startedAt = Date.now();
+
+    try {
+      const rawThreadState = await Promise.race([
+        fetchThreadStateOnce(threadId),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("thread_state timeout")),
+            THREAD_STATE_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+
+      console.info("agent:thread-state:load:success", {
+        runId,
+        threadId,
+        attempt,
+        durationMs: Date.now() - startedAt,
+        hasData: Boolean(rawThreadState),
+      });
+      return rawThreadState;
+    } catch (err) {
+      const retryable = isRetryableThreadStateError(err);
+      console.warn("agent:thread-state:load:failed", {
+        runId,
+        threadId,
+        attempt,
+        retryable,
+        error: toLogError(err),
+      });
+
+      if (!retryable || attempt === THREAD_STATE_MAX_ATTEMPTS) {
+        return null;
+      }
+
+      await sleep(THREAD_STATE_RETRY_BASE_DELAY_MS * attempt);
+    }
+  }
+
+  return null;
+}
+
+async function persistThreadHistory(
+  threadId: string,
+  agentId: string,
+  messageHistory: CoreMessage[],
+  runId: string,
+): Promise<void> {
+  const startedAt = Date.now();
+
+  const { error } = await supabase.from("thread_state").upsert({
+    thread_id: threadId,
+    agent_id: agentId,
+    message_history: messageHistory,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    console.error("agent:thread-state:upsert:error", {
+      runId,
+      threadId,
+      agentId,
+      error: toLogError(error),
+    });
+    return;
+  }
+
+  console.info("agent:thread-state:upsert:success", {
+    runId,
+    threadId,
+    agentId,
+    durationMs: Date.now() - startedAt,
+    messageCount: messageHistory.length,
+  });
+}
+
 export async function runAgent({
   userMessage,
-  slackUserId,
+  userId,
+  platform,
   threadId,
   thread,
 }: RunAgentParams) {
   const runId = Math.random().toString(36).slice(2, 10);
 
   try {
-    const agent = await getAgentBySlackId(slackUserId);
+    const agent =
+      platform === "discord"
+        ? await getAgentByDiscordId(userId)
+        : await getAgentBySlackId(userId);
+
     if (!agent) {
-      console.warn("agent:no-profile", { runId, slackUserId });
+      console.warn("agent:no-profile", { runId, userId, platform });
       await thread.post(
         (async function* () {
           yield {
@@ -85,26 +202,7 @@ export async function runAgent({
 
     console.info("agent:run:start", { runId, agentId: agent.id, threadId });
 
-    // Load existing thread history with timeout guard
-    const threadStateResult = await Promise.race([
-      supabase
-        .from("thread_state")
-        .select("message_history")
-        .eq("thread_id", threadId)
-        .single(),
-      new Promise<{ data: null }>((_, reject) =>
-        setTimeout(() => reject(new Error("thread_state timeout")), 3000),
-      ),
-    ]).catch((err) => {
-      console.warn("agent:thread-state:timeout", {
-        runId,
-        threadId,
-        error: toLogError(err),
-      });
-      return { data: null };
-    });
-
-    const rawThreadState = threadStateResult.data;
+    const rawThreadState = await loadThreadStateWithRetry(threadId, runId);
 
     const parsedThreadState = ThreadStateSchema.safeParse(rawThreadState);
     if (!parsedThreadState.success && rawThreadState) {
@@ -137,7 +235,53 @@ export async function runAgent({
     });
 
     await thread.startTyping();
-    await thread.post(result.fullStream);
+
+    const streamStartedAt = Date.now();
+    console.info("agent:stream:start", { runId, threadId, agentId: agent.id });
+    try {
+      await thread.post(result.fullStream);
+      console.info("agent:stream:complete", {
+        runId,
+        threadId,
+        agentId: agent.id,
+        durationMs: Date.now() - streamStartedAt,
+      });
+    } catch (streamError) {
+      console.error("agent:stream:error", {
+        runId,
+        threadId,
+        agentId: agent.id,
+        error: toLogError(streamError),
+      });
+
+      const fallbackText =
+        "I hit a temporary delivery issue while sending the response. Please retry your last message.";
+      try {
+        await thread.post(
+          (async function* () {
+            yield {
+              type: "text-delta",
+              textDelta: fallbackText,
+            };
+          })(),
+        );
+      } catch (fallbackError) {
+        console.error("agent:stream:fallback-post:error", {
+          runId,
+          threadId,
+          agentId: agent.id,
+          error: toLogError(fallbackError),
+        });
+      }
+
+      const fallbackHistory: CoreMessage[] = [
+        ...messages,
+        { role: "assistant" as const, content: fallbackText },
+      ].slice(-MAX_THREAD_HISTORY);
+
+      await persistThreadHistory(threadId, agent.id, fallbackHistory, runId);
+      return;
+    }
 
     // Save updated history with a bounded rolling window.
     const responseMessages = await result.response;
@@ -157,12 +301,7 @@ export async function runAgent({
       ...(parsedResponseHistory.success ? parsedResponseHistory.data : []),
     ].slice(-MAX_THREAD_HISTORY);
 
-    await supabase.from("thread_state").upsert({
-      thread_id: threadId,
-      agent_id: agent.id,
-      message_history: updatedHistory,
-      updated_at: new Date().toISOString(),
-    });
+    await persistThreadHistory(threadId, agent.id, updatedHistory, runId);
 
     console.info("agent:run:complete", { runId, agentId: agent.id, threadId });
   } catch (err) {
