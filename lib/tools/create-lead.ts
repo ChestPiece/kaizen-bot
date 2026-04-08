@@ -6,7 +6,10 @@ import type { CreateLeadArgs, Lead } from "@/types";
 export async function executeCreateLead(
   args: CreateLeadArgs,
   agentId: string,
-): Promise<{ success: boolean; lead: Lead } | { error: string }> {
+): Promise<
+  | { success: boolean; lead: Lead; warning?: string }
+  | { error: string }
+> {
   try {
     console.info("tool:createLead:start", {
       agentId,
@@ -46,6 +49,8 @@ export async function executeCreateLead(
       return { error: toToolErrorMessage() };
     }
 
+    let embeddingWarning: string | undefined;
+
     // Generate and store embedding so this lead is findable via match_leads
     try {
       const embedding = await embed(
@@ -58,22 +63,33 @@ export async function executeCreateLead(
           nationality: args.nationality,
         }),
       );
-      await supabase
+      const { error: embeddingInsertError } = await supabase
         .from("lead_embeddings")
         .insert({ lead_id: (lead as Lead).id, embedding });
+
+      if (embeddingInsertError) {
+        console.warn("tool:createLead:embedding_insert_failed", {
+          leadId: (lead as Lead).id,
+          error: toLogError(embeddingInsertError),
+        });
+        embeddingWarning =
+          "Lead was created, but semantic indexing failed. Search results may be incomplete until indexing is retried.";
+      }
     } catch (embErr) {
       // Non-fatal: lead is created, embedding will just be missing
       console.warn("tool:createLead:embedding_failed", {
         leadId: (lead as Lead).id,
         error: toLogError(embErr),
       });
+      embeddingWarning =
+        "Lead was created, but semantic indexing failed. Search results may be incomplete until indexing is retried.";
     }
 
     console.info("tool:createLead:success", {
       agentId,
       leadId: (lead as Lead).id,
     });
-    return { success: true, lead: lead as Lead };
+    return { success: true, lead: lead as Lead, warning: embeddingWarning };
   } catch (err) {
     console.error("tool:createLead:exception", {
       agentId,

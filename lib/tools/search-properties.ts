@@ -51,6 +51,33 @@ export async function executeSearchProperties(
     }
 
     const properties = (data as PropertyResult[]) ?? [];
+
+    if (properties.length === 0) {
+      const [{ count: totalProperties, error: totalError }, { count: embeddedProperties, error: embeddedError }] =
+        await Promise.all([
+          supabase
+            .from("properties")
+            .select("id", { count: "exact", head: true }),
+          supabase
+            .from("properties")
+            .select("id", { count: "exact", head: true })
+            .not("embedding", "is", null),
+        ]);
+
+      if (totalError || embeddedError) {
+        console.warn("tool:searchProperties:empty-diagnostics-error", {
+          totalError: totalError ? toLogError(totalError) : null,
+          embeddedError: embeddedError ? toLogError(embeddedError) : null,
+        });
+      } else {
+        console.warn("tool:searchProperties:empty-diagnostics", {
+          totalProperties: totalProperties ?? 0,
+          embeddedProperties: embeddedProperties ?? 0,
+          intent: args.intent ?? null,
+        });
+      }
+    }
+
     console.info("tool:searchProperties:success", { count: properties.length });
     return { properties };
   } catch (err) {
