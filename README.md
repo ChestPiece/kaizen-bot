@@ -50,6 +50,24 @@ python -m code_review_graph status
 
 Note: `python -m code_review_graph serve` is the MCP stdio server command and should be launched by your editor/tool host, not run manually in an interactive terminal.
 
+7. Validate DB + vector search health:
+
+```bash
+npx tsx scripts/health-check.ts
+```
+
+8. If health check reports missing lead embeddings, run a safe dry-run backfill:
+
+```bash
+npx tsx scripts/backfill-lead-embeddings.ts
+```
+
+Then apply writes:
+
+```bash
+npx tsx scripts/backfill-lead-embeddings.ts --apply
+```
+
 ## Slack Setup
 
 Full setup instructions, OAuth install flow, required scopes, env matrix, and troubleshooting are in:
