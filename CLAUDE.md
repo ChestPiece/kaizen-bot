@@ -22,6 +22,7 @@ production system.
 ---
 
 ## Running the Project
+
 ```bash
 npm run dev      # development server
 npm run build    # production build
@@ -34,6 +35,7 @@ workspace before considering anything done.
 ---
 
 ## How a Message Becomes a Response
+
 ```
 User @mentions bot in Slack
   → POST /api/webhooks/[platform]
@@ -50,6 +52,7 @@ raw query in agent.ts, call Supabase directly from bot.ts — don't.
 ---
 
 ## File Structure
+
 ```
 app/
   api/
@@ -84,19 +87,20 @@ docs/
 
 ## Database Tables
 
-| Table              | What It Holds                                          |
-|--------------------|--------------------------------------------------------|
-| `agents`           | Team members and their Slack user IDs                  |
-| `leads`            | CRM records moving through the status pipeline         |
-| `lead_notes`       | Per-lead interaction history                           |
-| `thread_state`     | Slack thread message history stored as JSONB           |
-| `properties`       | Property listings with pgvector embeddings (migration 003) |
-| `lead_embeddings`  | Per-lead semantic embeddings for similarity search (migration 003) |
+| Table             | What It Holds                                                      |
+| ----------------- | ------------------------------------------------------------------ |
+| `agents`          | Team members and their Slack user IDs                              |
+| `leads`           | CRM records moving through the status pipeline                     |
+| `lead_notes`      | Per-lead interaction history                                       |
+| `thread_state`    | Slack thread message history stored as JSONB                       |
+| `properties`      | Property listings with pgvector embeddings (migration 003)         |
+| `lead_embeddings` | Per-lead semantic embeddings for similarity search (migration 003) |
 
 Lead status pipeline:
 `new → contacted → qualified → negotiating → closed_won / closed_lost`
 
 Database functions (RPCs):
+
 - `add_lead_note_and_touch_lead` — atomically inserts note + updates `last_contacted_at`
 - `match_properties(query_embedding, match_count, filter_status, filter_intent)` — vector similarity search on properties
 - `match_leads(query_embedding, match_count)` — vector similarity search on leads
@@ -187,6 +191,7 @@ traces, SQL errors, and Supabase client errors never reach Slack.
 ## Environment Variables
 
 Full list in `.env.local.example`. Minimum required to run:
+
 ```
 SLACK_BOT_TOKEN
 SLACK_SIGNING_SECRET
@@ -198,12 +203,14 @@ CRON_SECRET
 ```
 
 Optional:
+
 ```
 OPENAI_MODEL          # Defaults to gpt-4o if unset
 SLACK_AUTH_MODE       # "single" or "multi" — inferred from env vars if unset
 ```
 
 Multi-workspace OAuth (required when SLACK_AUTH_MODE=multi):
+
 ```
 SLACK_CLIENT_ID
 SLACK_CLIENT_SECRET
@@ -235,6 +242,7 @@ Deployed on **Vercel**. Slack webhook URL is the Vercel deployment URL +
 the cron schedule without checking with the project owner first.
 
 <!-- code-review-graph MCP tools -->
+
 ## MCP Tools: code-review-graph
 
 **IMPORTANT: This project has a knowledge graph. ALWAYS use the
@@ -255,16 +263,16 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 ### Key Tools
 
-| Tool | Use when |
-|------|----------|
-| `detect_changes` | Reviewing code changes -> gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review -> token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
+| Tool                        | Use when                                               |
+| --------------------------- | ------------------------------------------------------ |
+| `detect_changes`            | Reviewing code changes -> gives risk-scored analysis   |
+| `get_review_context`        | Need source snippets for review -> token-efficient     |
+| `get_impact_radius`         | Understanding blast radius of a change                 |
+| `get_affected_flows`        | Finding which execution paths are impacted             |
+| `query_graph`               | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes`     | Finding functions/classes by name or keyword           |
+| `get_architecture_overview` | Understanding high-level codebase structure            |
+| `refactor_tool`             | Planning renames, finding dead code                    |
 
 ### Workflow
 
@@ -272,3 +280,23 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 2. Use `detect_changes` for code review.
 3. Use `get_affected_flows` to understand impact.
 4. Use `query_graph` pattern="tests_for" to check coverage.
+
+## Skill routing
+
+When the user's request matches an available skill, ALWAYS invoke it using the Skill
+tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
+The skill has specialized workflows that produce better results than ad-hoc answers.
+
+Key routing rules:
+- Product ideas, "is this worth building", brainstorming → invoke office-hours
+- Bugs, errors, "why is this broken", 500 errors → invoke investigate
+- Ship, deploy, push, create PR → invoke ship
+- QA, test the site, find bugs → invoke qa
+- Code review, check my diff → invoke review
+- Update docs after shipping → invoke document-release
+- Weekly retro → invoke retro
+- Design system, brand → invoke design-consultation
+- Visual audit, design polish → invoke design-review
+- Architecture review → invoke plan-eng-review
+- Save progress, checkpoint, resume → invoke checkpoint
+- Code quality, health check → invoke health
