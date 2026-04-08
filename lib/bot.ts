@@ -12,6 +12,7 @@ const {
   SLACK_ENCRYPTION_KEY,
   SLACK_AUTH_MODE,
 } = process.env;
+const databaseUrl = process.env.DATABASE_URL;
 
 if (!SLACK_SIGNING_SECRET) {
   throw new Error(
@@ -19,8 +20,15 @@ if (!SLACK_SIGNING_SECRET) {
   );
 }
 
-if (!process.env.DATABASE_URL) {
+if (!databaseUrl) {
   throw new Error("Missing required environment variable: DATABASE_URL");
+}
+
+if (!/:6543(?:\/|$)/.test(databaseUrl)) {
+  const detectedPort = databaseUrl.match(/:(\d+)(?:\/|$)/)?.[1] ?? "unknown";
+  throw new Error(
+    `DATABASE_URL must use the Supabase transaction pooler on port 6543. Detected port: ${detectedPort}.`,
+  );
 }
 
 const hasSingleWorkspaceConfig = Boolean(SLACK_BOT_TOKEN);
@@ -88,19 +96,61 @@ export const slackAdapter =
         encryptionKey: SLACK_ENCRYPTION_KEY,
       });
 
+const adapters: Record<string, ReturnType<typeof createSlackAdapter>> = {
+  slack: slackAdapter,
+};
+
 export const bot = new Chat({
   userName: "kaizen",
-  adapters: {
-    slack: slackAdapter,
-  },
-  state: createPostgresState(),
+  adapters,
+  state: createPostgresState({ url: databaseUrl }),
   concurrency: "queue",   // queue follow-up messages instead of dropping them during long tool loops
   dedupeTtlMs: 300_000,   // explicit 5-min dedup window (matches SDK default)
 });
 
+const threadLocks = new Map<string, Promise<void>>();
+
+async function withThreadLock(
+  threadId: string,
+  task: () => Promise<void>,
+): Promise<void> {
+  const previous = threadLocks.get(threadId) ?? Promise.resolve();
+
+  const current = previous
+    .catch(() => undefined)
+    .then(task)
+    .catch((error) => {
+      console.error("bot:thread-lock:error", {
+        threadId,
+        error: toLogError(error),
+      });
+      throw error;
+    });
+
+  threadLocks.set(threadId, current);
+
+  try {
+    await current;
+  } finally {
+    if (threadLocks.get(threadId) === current) {
+      threadLocks.delete(threadId);
+    }
+  }
+}
+
 let initializationPromise: Promise<void> | null = null;
+let lastInitializationErrorAt = 0;
+const INIT_RETRY_COOLDOWN_MS = 5000;
 
 export function ensureBotInitialized(): Promise<void> {
+  if (
+    !initializationPromise &&
+    lastInitializationErrorAt > 0 &&
+    Date.now() - lastInitializationErrorAt < INIT_RETRY_COOLDOWN_MS
+  ) {
+    throw new Error("Bot initialization recently failed. Retry shortly.");
+  }
+
   if (!initializationPromise) {
     console.info("bot:init:start", { slackMode });
     initializationPromise = bot
@@ -113,6 +163,7 @@ export function ensureBotInitialized(): Promise<void> {
           slackMode,
           error: toLogError(error),
         });
+        lastInitializationErrorAt = Date.now();
         initializationPromise = null;
         throw error;
       });
@@ -122,20 +173,28 @@ export function ensureBotInitialized(): Promise<void> {
 }
 
 bot.onNewMention(async (thread, message) => {
+  const platform = "slack";
   await thread.subscribe();
-  await runAgent({
-    userMessage: message.text,
-    slackUserId: message.author.userId,
-    threadId: thread.id,
-    thread,
+  await withThreadLock(thread.id, async () => {
+    await runAgent({
+      userMessage: message.text ?? "",
+      userId: message.author.userId,
+      platform,
+      threadId: thread.id,
+      thread,
+    });
   });
 });
 
 bot.onSubscribedMessage(async (thread, message) => {
-  await runAgent({
-    userMessage: message.text,
-    slackUserId: message.author.userId,
-    threadId: thread.id,
-    thread,
+  const platform = "slack";
+  await withThreadLock(thread.id, async () => {
+    await runAgent({
+      userMessage: message.text ?? "",
+      userId: message.author.userId,
+      platform,
+      threadId: thread.id,
+      thread,
+    });
   });
 });

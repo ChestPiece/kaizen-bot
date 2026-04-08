@@ -1,24 +1,44 @@
 import { after } from "next/server";
-import { bot } from "@/lib/bot";
+import { bot, ensureBotInitialized } from "@/lib/bot";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type Platform = keyof typeof bot.webhooks;
+type WebhookRouteContext = {
+  params: Promise<{ platform: string }>;
+};
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ platform: string }> },
+  context: WebhookRouteContext,
 ) {
-  const { platform } = await params;
-  type Platform = keyof typeof bot.webhooks;
-  const webhookHandler = bot.webhooks[platform as Platform];
+  const { platform } = await context.params;
 
-  if (!webhookHandler) {
-    return Response.json(
-      { error: `Unsupported platform: ${platform}` },
-      { status: 404 },
-    );
+  const retryNum = request.headers.get("x-slack-retry-num");
+  const retryReason = request.headers.get("x-slack-retry-reason");
+  if (platform === "slack" && retryNum && retryReason === "http_timeout") {
+    console.info("webhook:slack:retry-skipped", { retryNum, retryReason });
+    return new Response("OK", { status: 200 });
   }
 
-  return webhookHandler(request, {
-    waitUntil: (task: Promise<unknown>) => after(() => task),
+  try {
+    await ensureBotInitialized();
+  } catch (error) {
+    console.error("webhook:init:failed", {
+      platform,
+      error: String(error),
+    });
+    return new Response("Service Unavailable", { status: 503 });
+  }
+
+  const handler = bot.webhooks[platform as Platform];
+
+  if (!handler) {
+    return new Response(`Unknown platform: ${platform}`, { status: 404 });
+  }
+
+  return handler(request, {
+    waitUntil: (task) => after(() => task),
   });
 }
