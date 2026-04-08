@@ -22,6 +22,7 @@ export type LeadStatus = (typeof LEAD_STATUS_VALUES)[number];
 export interface Agent {
   id: string;
   slack_user_id: string;
+  discord_user_id: string | null;
   full_name: string;
   email: string;
   role: AgentRole;

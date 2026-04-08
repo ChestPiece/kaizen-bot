@@ -1,0 +1,2 @@
+ALTER TABLE agents
+  ADD COLUMN IF NOT EXISTS discord_user_id TEXT UNIQUE;
